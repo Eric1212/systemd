@@ -32,7 +32,6 @@ actions:
 
 jobs:
 - job: copr_build
-  trigger: commit
-  branch: s390x-sysdemd
+  trigger: pull_request
   targets:
   - fedora-rawhide-s390x
