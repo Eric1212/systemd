@@ -16,6 +16,7 @@
 #include "sd-netlink.h"
 
 #include "alloc-util.h"
+#include "errno-util.h"
 #include "fd-util.h"
 #include "missing-network.h"
 #include "netlink-genl.h"
@@ -709,7 +710,12 @@ TEST(sock_diag_unix) {
         _cleanup_(sd_netlink_unrefp) sd_netlink *nl = NULL;
         int r;
 
-        ASSERT_OK(sd_sock_diag_socket_open(&nl));
+        r = sd_sock_diag_socket_open(&nl);
+        /* Some restricted build sandboxes refuse NETLINK_SOCK_DIAG with
+         * -EPROTONOSUPPORT. Skip rather than abort. */
+        if (ERRNO_IS_NEG_NOT_SUPPORTED(r))
+                return (void) log_tests_skipped_errno(r, "NETLINK_SOCK_DIAG unavailable");
+        ASSERT_OK(r);
 
         _cleanup_close_ int unix_fd = ASSERT_FD(socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC, 0));
         ASSERT_OK(socket_autobind(unix_fd, /* ret_name= */ NULL));

@@ -4,6 +4,7 @@
 
 #include "alloc-util.h"
 #include "dhcp-lease-internal.h"
+#include "errno-util.h"
 #include "hashmap.h"
 #include "hostname-setup.h"
 #include "network-internal.h"
@@ -176,9 +177,16 @@ TEST(vrf_table) {
 
 TEST(manager_enumerate) {
         _cleanup_(manager_freep) Manager *manager = NULL;
+        int r;
 
         ASSERT_OK(manager_new(&manager, /* test_mode= */ true));
-        ASSERT_OK(manager_setup(manager));
+        r = manager_setup(manager);
+        /* Some restricted build sandboxes (mock/nspawn, TCG emulation) refuse
+         * NETLINK_ROUTE socket opening with -EPROTONOSUPPORT. Skip rather than
+         * abort in that case. */
+        if (ERRNO_IS_NEG_NOT_SUPPORTED(r))
+                return (void) log_tests_skipped_errno(r, "manager_setup() not supported (netlink restricted?)");
+        ASSERT_OK(r);
 
         /* TODO: should_reload, is false if the config dirs do not exist, so we can't do this test here, move
          * it to a test for paths_check_timestamps directly. */
