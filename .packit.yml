@@ -30,48 +30,15 @@ actions:
     - git clone https://src.fedoraproject.org/rpms/systemd .packit_rpm
     - bash -c 'git -C .packit_rpm checkout "$(grep GIT_COMMIT= mkosi/mkosi.pkgenv/mkosi.conf.d/centos-fedora.conf | cut -d= -f2)"'
     - bash -c 'echo "%bcond upstream 1" > .packit_rpm/systemd.spec.new'
-    # Aggressive trim: keep only what the 15 target tests need
-    # (libsystemd/libsystemd-shared base + networkd + resolve).
     - bash -c 'echo "%define meson_extra_configure_options --werror -Dman=disabled -Dhtml=disabled -Dukify=false -Dvmspawn=false -Dnspawn=false -Dportabled=false -Dhomed=false -Dimportd=false -Dsysupdate=false -Dsysupdated=false -Dpstore=false -Dremote=false -Dhwdb=false -Doomd=false -Drepart=false -Dsysext=false -Dconfext=false -Dlibcryptsetup=false -Dlibfido2=false -Dlibcurl=false -Dquotacheck=false -Drfkill=false -Dbacklight=false -Dhibernate=false -Dxdg-autostart=false -Dcoredump=false -Dlogind=false -Dmachined=false -Dtimesyncd=false -Dtimedated=false -Dlocaled=false -Dhostnamed=false -Dvconsole=false -Dfirstboot=false -Dbinfmt=false -Drandomseed=false -Dsysusers=false -Dtmpfiles=false -Dkernel-install=false -Dbootloader=false -Defi=false -Dxkbcommon=false -Dpolkit=false -Dgnutls=false -Didn=false -Dlibidn2=false -Dmicrohttpd=false -Dp11kit=false -Dpcre2=false -Dfuzz-tests=false -Dslow-tests=false" >> .packit_rpm/systemd.spec.new'
     - bash -c 'cat .packit_rpm/systemd.spec >> .packit_rpm/systemd.spec.new'
     - mv .packit_rpm/systemd.spec.new .packit_rpm/systemd.spec
-    # Override %build: compile only the 15 test binaries we care about,
-    # plus their transitive deps (libsystemd, libsystemd-shared, etc.).
-    # Skip building systemctl, journalctl, and the ~100 other binaries.
     - bash -c 'sed -i "0,/^%build$/{//d;}" .packit_rpm/systemd.spec'
-    - bash -c 'cat >> .packit_rpm/systemd.spec << '\''EOF'\''
-
-%build
-%meson %{?meson_extra_configure_options}
-%__meson compile -C %{_vpath_builddir} %{?_smp_mflags} \
-    test-network test-resolved-link test-resolved-stream \
-    test-json test-loopback test-process-util test-netlink \
-    test-mountpoint-util test-namespace-util test-nsresource \
-    test-raw-clone test-sigbus test-socket-netlink \
-    test-terminal-util test-event
-EOF'
-    # Override %install: no-op (we are not building a usable RPM).
+    - bash -c 'printf "%s\n" "" "%build" "%meson %{?meson_extra_configure_options}" "%__meson compile -C %{_vpath_builddir} %{?_smp_mflags} test-network test-resolved-link test-resolved-stream test-json test-loopback test-process-util test-netlink test-mountpoint-util test-namespace-util test-nsresource test-raw-clone test-sigbus test-socket-netlink test-terminal-util test-event" >> .packit_rpm/systemd.spec'
     - bash -c 'sed -i "0,/^%install$/{//d;}" .packit_rpm/systemd.spec'
-    - bash -c 'cat >> .packit_rpm/systemd.spec << '\''EOF'\''
-
-%install
-: diagnostic build - skip install
-EOF'
-    # Override %check: run ONLY the 15 tests, with generous timeouts,
-    # and always cat the testlog so per-test stderr is visible.
+    - bash -c 'printf "%s\n" "" "%install" "true" >> .packit_rpm/systemd.spec'
     - bash -c 'sed -i "0,/^%check$/{//d;}" .packit_rpm/systemd.spec'
-    - bash -c 'cat >> .packit_rpm/systemd.spec << '\''EOF'\''
-
-%check
-trap '\''cat %{_vpath_builddir}/meson-logs/testlog.txt 2>/dev/null || true'\'' EXIT
-%__meson test -C %{_vpath_builddir} \
-    --print-errorlogs --no-rebuild --timeout-multiplier 4 \
-    test-network test-resolved-link test-resolved-stream \
-    test-json test-loopback test-process-util test-netlink \
-    test-mountpoint-util test-namespace-util test-nsresource \
-    test-raw-clone test-sigbus test-socket-netlink \
-    test-terminal-util test-event
-EOF'
+    - bash -c 'printf "%s\n" "" "%check" "set +e" "%__meson test -C %{_vpath_builddir} --print-errorlogs --no-rebuild --timeout-multiplier 4 test-network test-resolved-link test-resolved-stream test-json test-loopback test-process-util test-netlink test-mountpoint-util test-namespace-util test-nsresource test-raw-clone test-sigbus test-socket-netlink test-terminal-util test-event" "rc=\$?" "cat %{_vpath_builddir}/meson-logs/testlog.txt 2>/dev/null || true" "exit \$rc" >> .packit_rpm/systemd.spec'
 
 jobs:
 - job: copr_build
