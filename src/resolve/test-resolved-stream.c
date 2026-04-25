@@ -29,6 +29,7 @@
 #include "sparse-endian.h"
 #include "tests.h"
 #include "time-util.h"
+#include "architecture.h"
 #include "virt.h"
 
 static union sockaddr_union server_address;
@@ -388,12 +389,13 @@ int main(int argc, char **argv) {
 
         test_setup_logging(LOG_DEBUG);
 
-        /* Inside slow TCG-emulated containers (copr/mock for foreign arches),
-         * even a generous 60s event-loop timeout is not always sufficient,
-         * and the test's threaded server occasionally races with the test
-         * harness's signal handling. Skip rather than flake. */
-        if (detect_container() != VIRTUALIZATION_NONE)
-                return log_tests_skipped("DNS stream test unreliable inside container sandbox");
+        /* Inside slow TCG-emulated s390x containers (Fedora copr/mock), even
+         * a generous 60s event-loop timeout is not always sufficient, and
+         * the test's threaded server races with the harness's signal
+         * handling. Narrow the skip to the combination we observed broken
+         * — running this test inside an x86_64 dev container is fine. */
+        if (detect_container() != VIRTUALIZATION_NONE && uname_architecture() == ARCHITECTURE_S390X)
+                return log_tests_skipped("DNS stream test unreliable on TCG-emulated s390x sandbox");
 
         r = try_isolate_network();
         if (ERRNO_IS_NEG_PRIVILEGE(r))

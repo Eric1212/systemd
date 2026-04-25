@@ -23,6 +23,7 @@
 #include "tests.h"
 #include "time-util.h"
 #include "tmpfile-util.h"
+#include "architecture.h"
 #include "virt.h"
 
 static int prepare_handler(sd_event_source *s, void *userdata) {
@@ -344,12 +345,12 @@ TEST(rtqueue) {
 
         /* qemu-in-TCG mode does not correctly preserve sigval across realtime
          * signal delivery; handlers receive si_int=0 instead of the queued
-         * value. The copr/mock build runs inside systemd-nspawn so we cannot
-         * see the outer qemu directly — fall back to detecting *any* container
-         * on the assumption that a foreign-arch sandbox is the typical TCG
-         * carrier. */
-        if (detect_container() != VIRTUALIZATION_NONE)
-                return (void) log_tests_skipped("realtime sigqueue sigval is not correctly delivered under sandboxed/TCG kernels");
+         * value. Observed on Fedora copr s390x builders (TCG-on-nspawn).
+         * Narrow the skip to that specific combination so that running tests
+         * inside an x86_64 docker dev environment (where the kernel is fine)
+         * still exercises this path. */
+        if (detect_container() != VIRTUALIZATION_NONE && uname_architecture() == ARCHITECTURE_S390X)
+                return (void) log_tests_skipped("realtime sigqueue sigval not correctly delivered under TCG-emulated s390x sandbox");
 
         ASSERT_OK(sd_event_default(&e));
 

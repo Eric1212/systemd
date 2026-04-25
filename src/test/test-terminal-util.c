@@ -18,6 +18,7 @@
 #include "terminal-util.h"
 #include "tests.h"
 #include "time-util.h"
+#include "architecture.h"
 #include "tmpfile-util.h"
 #include "virt.h"
 
@@ -61,11 +62,10 @@ TEST(getttyname_malloc) {
         _cleanup_free_ char *ttyname = NULL;
         int r;
 
-        /* See test_terminal_is_pty_fd: in nspawn the master ptmx fd is not
-         * recognized as a tty by the kernel's TIOCGPTPEER probe path, so
-         * getttyname_malloc() returns ENOTTY. */
-        if (detect_container() != VIRTUALIZATION_NONE)
-                return (void) log_tests_skipped("getttyname_malloc() unreliable inside container sandbox");
+        /* See test_terminal_is_pty_fd: same root cause (devpts bind-mount
+         * via nspawn-on-TCG-s390x). */
+        if (detect_container() != VIRTUALIZATION_NONE && uname_architecture() == ARCHITECTURE_S390X)
+                return (void) log_tests_skipped("getttyname_malloc() unreliable on TCG-emulated s390x sandbox");
 
         _cleanup_close_ int master = ASSERT_OK_ERRNO(posix_openpt(O_RDWR|O_NOCTTY));
         r = getttyname_malloc(master, &ttyname);
@@ -291,13 +291,13 @@ TEST(query_term_for_tty) {
 TEST(terminal_is_pty_fd) {
         int r;
 
-        /* Inside systemd-nspawn (typical for copr/mock builds), /dev/ptmx is
+        /* In Fedora copr s390x sandboxes (nspawn-on-TCG), /dev/ptmx is
          * bind-mounted from the host; the resulting fd is a working PTY but
          * does not satisfy terminal_is_pty_fd()'s sysfs-based identity check
          * because the per-pts entries belong to the host's devpts mount.
-         * Skip rather than fail in that environment. */
-        if (detect_container() != VIRTUALIZATION_NONE)
-                return (void) log_tests_skipped("terminal_is_pty_fd() heuristics unreliable inside container sandbox");
+         * Narrow the skip — x86_64 container dev environments behave correctly. */
+        if (detect_container() != VIRTUALIZATION_NONE && uname_architecture() == ARCHITECTURE_S390X)
+                return (void) log_tests_skipped("terminal_is_pty_fd() heuristics unreliable on TCG-emulated s390x sandbox");
 
         _cleanup_close_ int fd1 = ASSERT_OK(openpt_allocate(O_RDWR, /* ret_peer_path= */ NULL));
         ASSERT_OK_POSITIVE(terminal_is_pty_fd(fd1));
