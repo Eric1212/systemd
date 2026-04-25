@@ -38,12 +38,13 @@ actions:
     # in the copr mock chroot parse context, and the check that follows it.
     - bash -c 'sed -i "s|^%global ntpvendor %(source /etc/os-release.*|%global ntpvendor fedora|" .packit_rpm/systemd.spec'
     - bash -c 'sed -i "/%{!?ntpvendor:/d" .packit_rpm/systemd.spec'
-    - bash -c 'sed -i "0,/^%build$/{//d;}" .packit_rpm/systemd.spec'
-    - bash -c 'printf "%s\n" "" "%build" "%meson %{?meson_extra_configure_options}" "%__meson compile -C %{_vpath_builddir} %{?_smp_mflags} test-network test-resolved-link test-resolved-stream test-json test-loopback test-process-util test-netlink test-mountpoint-util test-namespace-util test-nsresource test-raw-clone test-sigbus test-socket-netlink test-terminal-util test-event" >> .packit_rpm/systemd.spec'
-    - bash -c 'sed -i "0,/^%install$/{//d;}" .packit_rpm/systemd.spec'
-    - bash -c 'printf "%s\n" "" "%install" "true" >> .packit_rpm/systemd.spec'
-    - bash -c 'sed -i "0,/^%check$/{//d;}" .packit_rpm/systemd.spec'
-    - bash -c 'printf "%s\n" "" "%check" "set +e" "%__meson test -C %{_vpath_builddir} --print-errorlogs --no-rebuild --timeout-multiplier 4 test-network test-resolved-link test-resolved-stream test-json test-loopback test-process-util test-netlink test-mountpoint-util test-namespace-util test-nsresource test-raw-clone test-sigbus test-socket-netlink test-terminal-util test-event" "rc=\$?" "cat %{_vpath_builddir}/meson-logs/testlog.txt 2>/dev/null || true" "exit \$rc" >> .packit_rpm/systemd.spec'
+    # Strip the original %build, %install, %check sections (headers + bodies)
+    # in one go — delete from line "%build" to the line before "%files".
+    - bash -c 'sed -i "/^%build$/,/^%files\b/{/^%files\b/!d}" .packit_rpm/systemd.spec'
+    # Build the replacement sections in /tmp/newsec.txt.
+    - bash -c "printf '%s\n' '%build' '%meson %{?meson_extra_configure_options}' '%__meson compile -C %{_vpath_builddir} %{?_smp_mflags} test-network test-resolved-link test-resolved-stream test-json test-loopback test-process-util test-netlink test-mountpoint-util test-namespace-util test-nsresource test-raw-clone test-sigbus test-socket-netlink test-terminal-util test-event' '' '%install' 'true' '' '%check' 'set +e' '%__meson test -C %{_vpath_builddir} --print-errorlogs --no-rebuild --timeout-multiplier 4 test-network test-resolved-link test-resolved-stream test-json test-loopback test-process-util test-netlink test-mountpoint-util test-namespace-util test-nsresource test-raw-clone test-sigbus test-socket-netlink test-terminal-util test-event' 'rc=\$?' 'cat %{_vpath_builddir}/meson-logs/testlog.txt 2>/dev/null || true' 'exit \$rc' '' > /tmp/newsec.txt"
+    # Insert /tmp/newsec.txt right BEFORE the line "%files".
+    - bash -c 'awk "/^%files/ && !i { while ((getline l < \"/tmp/newsec.txt\") > 0) print l; i=1 } 1" .packit_rpm/systemd.spec > /tmp/spec.new && mv /tmp/spec.new .packit_rpm/systemd.spec'
 
 jobs:
 - job: copr_build
