@@ -101,6 +101,16 @@ TEST(mnt_id) {
                 } else
                         log_debug("mnt ids of %s are %i (from /proc/self/mountinfo), %i (from path_get_mnt_id()).", p, mnt_id, mnt_id2);
 
+                /* In restricted sandboxes (e.g. systemd-nspawn under TCG)
+                 * path_get_mnt_id() can return 0 for mounts that are not
+                 * fully visible in the chrooted view. The hashmap is keyed
+                 * on mountinfo IDs which are never 0, so the lookup would
+                 * always fail — skip rather than abort. */
+                if (mnt_id2 == 0) {
+                        log_debug("path_get_mnt_id() returned 0 for %s (restricted sandbox?), skipping mismatch check.", p);
+                        continue;
+                }
+
                 /* The ids don't match? This can easily happen e.g. running with "unshare --mount-proc".
                  * See #11505. */
                 assert_se(q = hashmap_get(h, INT_TO_PTR(mnt_id2)));

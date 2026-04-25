@@ -457,8 +457,12 @@ TEST(sd_netlink_message_get_errno) {
 TEST(message_array) {
         _cleanup_(sd_netlink_unrefp) sd_netlink *genl = NULL;
         _cleanup_(sd_netlink_message_unrefp) sd_netlink_message *m = NULL;
+        int r;
 
-        ASSERT_OK(sd_genl_socket_open(&genl));
+        r = sd_genl_socket_open(&genl);
+        if (ERRNO_IS_NEG_NOT_SUPPORTED(r))
+                return (void) log_tests_skipped_errno(r, "GENERIC netlink unavailable (sandbox restricted?)");
+        ASSERT_OK(r);
         ASSERT_OK(sd_genl_message_new(genl, CTRL_GENL_NAME, CTRL_CMD_GETFAMILY, &m));
 
         ASSERT_OK(sd_netlink_message_open_container(m, CTRL_ATTR_MCAST_GROUPS));
