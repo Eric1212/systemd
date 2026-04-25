@@ -16,7 +16,16 @@ TEST(raw_clone) {
         assert_se(getpid() == parent);
 
         pid = raw_clone(0);
-        assert_se(pid >= 0);
+        if (pid < 0) {
+                /* qemu-TCG cross-arch sandboxes (e.g. s390x copr) may reject
+                 * even a plain raw_clone() with EPERM/ENOSYS. Skip rather than
+                 * abort the whole test in that case. */
+                if (ERRNO_IS_PRIVILEGE(errno) || ERRNO_IS_NOT_SUPPORTED(errno) || errno == EAGAIN) {
+                        log_tests_skipped_errno(errno, "raw_clone() not available in sandbox");
+                        return;
+                }
+                assert_se(pid >= 0);
+        }
 
         pid2 = getpid();
         log_info("raw_clone: "PID_FMT" getpid()→"PID_FMT" getpid()→"PID_FMT,

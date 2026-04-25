@@ -175,10 +175,10 @@ static void *tls_dns_server(void *p) {
 #endif
 
 static const char *TEST_DOMAIN = "example.com";
-/* 30s: accommodates slow test environments such as copr's TCG-emulated
- * s390x/ppc64le builders, while still being short enough to fail fast on
- * real bugs. meson's --timeout-multiplier covers the outer test timeout. */
-static const uint64_t EVENT_TIMEOUT_USEC = 30 * 1000 * 1000;
+/* 60s: accommodates slow test environments such as copr's TCG-emulated
+ * s390x/ppc64le builders, where 30s was empirically not enough. meson's
+ * --timeout-multiplier covers the outer test timeout. */
+static const uint64_t EVENT_TIMEOUT_USEC = 60 * 1000 * 1000;
 
 static void send_simple_question(DnsStream *stream, uint16_t type) {
         _cleanup_(dns_packet_unrefp) DnsPacket *p = NULL;

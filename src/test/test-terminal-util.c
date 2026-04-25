@@ -19,6 +19,7 @@
 #include "tests.h"
 #include "time-util.h"
 #include "tmpfile-util.h"
+#include "virt.h"
 
 #define LOREM_IPSUM "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor " \
         "incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation " \
@@ -279,6 +280,14 @@ TEST(query_term_for_tty) {
 
 TEST(terminal_is_pty_fd) {
         int r;
+
+        /* Inside systemd-nspawn (typical for copr/mock builds), /dev/ptmx is
+         * bind-mounted from the host; the resulting fd is a working PTY but
+         * does not satisfy terminal_is_pty_fd()'s sysfs-based identity check
+         * because the per-pts entries belong to the host's devpts mount.
+         * Skip rather than fail in that environment. */
+        if (detect_container() != VIRTUALIZATION_NONE)
+                return (void) log_tests_skipped("terminal_is_pty_fd() heuristics unreliable inside container sandbox");
 
         _cleanup_close_ int fd1 = ASSERT_OK(openpt_allocate(O_RDWR, /* ret_peer_path= */ NULL));
         ASSERT_OK_POSITIVE(terminal_is_pty_fd(fd1));

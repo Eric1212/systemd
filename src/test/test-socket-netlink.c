@@ -379,6 +379,8 @@ TEST(netns_get_nsid) {
         int r;
 
         r = netns_get_nsid(-EBADF, &u);
+        if (ERRNO_IS_NEG_NOT_SUPPORTED(r))
+                return (void) log_tests_skipped_errno(r, "netns_get_nsid() unavailable (sandbox restricted?)");
         assert_se(r == -ENODATA || r >= 0);
         if (r == -ENODATA)
                 log_info("Our network namespace has no NSID assigned.");
